@@ -1,5 +1,5 @@
 import unittest
-from pyoarfish.client import ObClient, VecIndexType, VecIndexParam, VecIndexParams
+from pyoarfish.client import ObClient, VecIndexType, VecIndexParam
 from pyoarfish.schema import VECTOR, VectorIndex
 from sqlalchemy import Column, Integer
 from sqlalchemy.sql import func
@@ -87,7 +87,10 @@ class ObClientTest(unittest.TestCase):
             Column('c1', Integer, primary_key=True, autoincrement=False),
             Column('c2', VECTOR(3)),
         ]
-        self.client.create_table('ttt', cols)
+        idxs = [
+            VectorIndex('idx1', 'c2', params='distance=l2, type=hnsw, lib=vsag'),
+        ]
+        self.client.create_table('ttt', cols, idxs)
 
         data = [
             {'c1':1, 'c2':[1,1,1]},
@@ -98,6 +101,27 @@ class ObClientTest(unittest.TestCase):
         res = self.client.ann_search('ttt', [0,0,0], 'c2', func.l2_distance, 1, ['c1'])
         print(f"res1 = {res.fetchall()}")
         res = self.client.ann_search('ttt', [0,0,0], 'c2', func.l2_distance, 1)
+        print(f"res2 = {res.fetchall()}")
+
+        self.client.drop_table_if_exist('ttt')
+
+    def test_precise_search(self):
+        self.client.drop_table_if_exist('ttt')
+        cols = [
+            Column('c1', Integer, primary_key=True, autoincrement=False),
+            Column('c2', VECTOR(3)),
+        ]
+        self.client.create_table('ttt', cols)
+
+        data = [
+            {'c1':1, 'c2':[1,1,1]},
+            {'c1':2, 'c2':[2,2,2]}
+        ]
+        self.client.insert('ttt', data)
+
+        res = self.client.precise_search('ttt', [0,0,0], 'c2', func.l2_distance, 1, ['c1'])
+        print(f"res1 = {res.fetchall()}")
+        res = self.client.precise_search('ttt', [0,0,0], 'c2', func.l2_distance, 1)
         print(f"res2 = {res.fetchall()}")
 
         self.client.drop_table_if_exist('ttt')

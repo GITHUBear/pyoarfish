@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Optional, Dict, Union
-from sqlalchemy import create_engine, MetaData, Table, Column, Index, select
+from sqlalchemy import create_engine, MetaData, Table, Column, Index, select, text
 from sqlalchemy.exc import NoSuchTableError
 from .index_param import VecIndexParams, VecIndexParam
 from ..schema import VECTOR, ObTable, VectorIndex, CreateVectorIndex, l2_distance, cosine_distance, inner_product
@@ -155,7 +155,37 @@ class ObClient:
     ):
         pass
 
+    # `delete` is recommanded to use sqlalchemy directly.
+
     def ann_search(
+        self,
+        table_name: str,
+        vec_data: list,
+        vec_column_name: str,
+        distance_func,
+        topk: int = 10,
+        output_column_name: Optional[List[str]] = None,
+    ):
+        try:
+            table = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+        except NoSuchTableError:
+            return
+
+        if output_column_name is not None:
+            columns = [table.c[column_name] for column_name in output_column_name]
+            stmt = select(*columns).order_by(distance_func(table.c[vec_column_name], str(vec_data)))
+            stmt_str = str(stmt.compile(compile_kwargs={"literal_binds": True})) + f' APPROXIMATE limit {topk}'
+            with self.engine.connect() as conn:
+                with conn.begin():
+                    return conn.execute(text(stmt_str))
+        else:
+            stmt = select(table).order_by(distance_func(table.c[vec_column_name], str(vec_data)))
+            stmt_str = str(stmt.compile(compile_kwargs={"literal_binds": True})) + f' APPROXIMATE limit {topk}'
+            with self.engine.connect() as conn:
+                with conn.begin():
+                    return conn.execute(text(stmt_str))
+                
+    def precise_search(
         self,
         table_name: str,
         vec_data: list,
