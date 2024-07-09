@@ -4,6 +4,8 @@ A python binding library for OceanBase Vector Store.
 
 ## quick start
 
+Refer to [test_ob_client.py](https://github.com/GITHUBear/pyoarfish/blob/main/tests/test_ob_client.py) for more examples.
+
 - Create a table with vector column.
 
 ```python
@@ -124,4 +126,4 @@ print(f"res2 = {res.fetchall()}")
 client.drop_table_if_exist('ttt')
 ```
 
-- more examples...
+- ....
