@@ -1,8 +1,9 @@
 import unittest
 from pyoarfish.client import ObClient, VecIndexType, VecIndexParam
 from pyoarfish.schema import VECTOR, VectorIndex
-from sqlalchemy import Column, Integer
+from sqlalchemy import Column, Integer, Table
 from sqlalchemy.sql import func
+from sqlalchemy.exc import NoSuchTableError
 
 class ObClientTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -125,6 +126,71 @@ class ObClientTest(unittest.TestCase):
         print(f"res2 = {res.fetchall()}")
 
         self.client.drop_table_if_exist('ttt')
+
+    def test_perform_delete(self):
+        self.client.drop_table_if_exist('ttt')
+        cols = [
+            Column('c1', Integer, primary_key=True, autoincrement=False),
+            Column('c2', VECTOR(3)),
+        ]
+        self.client.create_table('ttt', cols)
+
+        data = [
+            {'c1':1, 'c2':[1,1,1]},
+            {'c1':2, 'c2':[2,2,2]},
+            {'c1':3, 'c2':[3,3,3]}
+        ]
+        self.client.insert('ttt', data)
+        
+        # customize where clause
+        try:
+            table = Table('ttt', self.client.metadata_obj, autoload_with=self.client.engine)
+        except NoSuchTableError:
+            return
+        cond = [
+            (table.c['c1'] == 1) | (table.c['c1'] == 2)
+        ]
+        self.client.delete('ttt', cond)
+
+        self.client.drop_table_if_exist('ttt')
+
+    def test_perform_update(self):
+        self.client.drop_table_if_exist('ttt')
+        cols = [
+            Column('c1', Integer),
+            Column('c2', VECTOR(3)),
+            Column('c3', Integer)
+        ]
+        self.client.create_table('ttt', cols)
+
+        data = [
+            {'c1':1, 'c2':[1,1,1], 'c3':1},
+            {'c1':2, 'c2':[2,2,2], 'c3':1},
+            {'c1':3, 'c2':[3,3,3], 'c3':1}
+        ]
+        self.client.insert('ttt', data)
+
+        value_clause = [
+            {'c2':[1,2,3]} | {'c3':2}
+        ]
+        self.client.update('ttt', value_clause)
+
+        self.client.drop_table_if_exist('ttt')
+
+    def test_check_table_exist(self):
+        self.client.drop_table_if_exist('ttt')
+        self.assertFalse(self.client.check_table_exists('ttt'))
+
+        cols = [
+            Column('c1', Integer),
+            Column('c2', VECTOR(3)),
+            Column('c3', Integer)
+        ]
+        self.client.create_table('ttt', cols)
+        self.assertTrue(self.client.check_table_exists('ttt'))
+
+        self.client.drop_table_if_exist('ttt')
+        self.assertFalse(self.client.check_table_exists('ttt'))
 
 if __name__ == '__main__':
     unittest.main()

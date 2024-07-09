@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Optional, Dict, Union
-from sqlalchemy import create_engine, MetaData, Table, Column, Index, select, text
+from sqlalchemy import create_engine, MetaData, Table, Column, Index, select, delete, update, text, inspect
 from sqlalchemy.exc import NoSuchTableError
 from .index_param import VecIndexParams, VecIndexParam
 from ..schema import VECTOR, ObTable, VectorIndex, CreateVectorIndex, l2_distance, cosine_distance, inner_product
@@ -33,6 +33,10 @@ class ObClient:
         connection_str = f"mysql+pymysql://{user}:{password}@{uri}/{db_name}?charset=utf8mb4"
         self.engine = create_engine(connection_str, **kwargs)
         self.metadata_obj = MetaData()
+
+    def check_table_exists(self, table_name: str):
+        inspector = inspect(self.engine)
+        return inspector.has_table(table_name)
     
     def create_table(
         self,
@@ -127,6 +131,7 @@ class ObClient:
             return
         with self.engine.connect():
             table.drop(self.engine, checkfirst=True)
+            self.metadata_obj.remove(table)
 
     def insert(
         self,
@@ -153,9 +158,49 @@ class ObClient:
         table_name: str,
         data: Union[Dict, List[Dict]],
     ):
-        pass
+        try:
+            table = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+        except NoSuchTableError:
+            return
+        # TODO
+        raise ValueError("not implement")
 
-    # `delete` is recommanded to use sqlalchemy directly.
+    def update(
+        self,
+        table_name: str,
+        values_clause,
+        where_clause = None
+    ):
+        try:
+            table = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+        except NoSuchTableError:
+            return
+        
+        with self.engine.connect() as conn:
+            with conn.begin():
+                if where_clause is not None:
+                    update_stmt = update(table).where(*where_clause).values(*values_clause)
+                else:
+                    update_stmt = update(table).values(*values_clause)
+                conn.execute(update_stmt)
+
+    def delete(
+        self,
+        table_name: str,
+        where_clause = None
+    ):
+        try:
+            table = Table(table_name, self.metadata_obj, autoload_with=self.engine)
+        except NoSuchTableError:
+            return
+        
+        with self.engine.connect() as conn:
+            with conn.begin():
+                if where_clause is not None:
+                    delete_stmt = delete(table).where(*where_clause)
+                else:
+                    delete_stmt = delete(table)
+                conn.execute(delete_stmt)
 
     def ann_search(
         self,
@@ -165,6 +210,7 @@ class ObClient:
         distance_func,
         topk: int = 10,
         output_column_name: Optional[List[str]] = None,
+        where_clause = None,
     ):
         try:
             table = Table(table_name, self.metadata_obj, autoload_with=self.engine)
@@ -174,12 +220,16 @@ class ObClient:
         if output_column_name is not None:
             columns = [table.c[column_name] for column_name in output_column_name]
             stmt = select(*columns).order_by(distance_func(table.c[vec_column_name], str(vec_data)))
+            if where_clause is not None:
+                stmt = stmt.where(*where_clause)
             stmt_str = str(stmt.compile(compile_kwargs={"literal_binds": True})) + f' APPROXIMATE limit {topk}'
             with self.engine.connect() as conn:
                 with conn.begin():
                     return conn.execute(text(stmt_str))
         else:
             stmt = select(table).order_by(distance_func(table.c[vec_column_name], str(vec_data)))
+            if where_clause is not None:
+                stmt = stmt.where(*where_clause)
             stmt_str = str(stmt.compile(compile_kwargs={"literal_binds": True})) + f' APPROXIMATE limit {topk}'
             with self.engine.connect() as conn:
                 with conn.begin():
@@ -193,6 +243,7 @@ class ObClient:
         distance_func,
         topk: int = 10,
         output_column_name: Optional[List[str]] = None,
+        where_clause = None,
     ):
         try:
             table = Table(table_name, self.metadata_obj, autoload_with=self.engine)
@@ -202,11 +253,15 @@ class ObClient:
         if output_column_name is not None:
             columns = [table.c[column_name] for column_name in output_column_name]
             stmt = select(*columns).order_by(distance_func(table.c[vec_column_name], str(vec_data))).limit(topk)
+            if where_clause is not None:
+                stmt = stmt.where(*where_clause)
             with self.engine.connect() as conn:
                 with conn.begin():
                     return conn.execute(stmt)
         else:
             stmt = select(table).order_by(distance_func(table.c[vec_column_name], str(vec_data))).limit(topk)
+            if where_clause is not None:
+                stmt = stmt.where(*where_clause)
             with self.engine.connect() as conn:
                 with conn.begin():
                     return conn.execute(stmt)

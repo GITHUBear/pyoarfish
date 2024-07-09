@@ -8,7 +8,7 @@ class Vector:
             value = np.asarray(value, dtype='>f4')
 
         if value.ndim != 1:
-            raise ValueError('expected ndim to be 1')
+            raise ValueError(f'expected ndim to be 1: {value} {value.ndim}')
 
         self._value = value
 
