@@ -43,7 +43,7 @@ client.create_table('t1', cols, idxs)
 - Create a table with vector index and common index by `VectorIndexParams`.
 
 ```python
-from pyoarfish.client import ObClient
+from pyoarfish.client import ObClient, VecIndexType
 from pyoarfish.schema import VECTOR
 from sqlalchemy import Column, Integer, Index
 
@@ -67,7 +67,7 @@ client.create_table_with_index_params('ttt', cols, None, index_params)
 - Create Vector Index by `VecIndexParam` after table is created.
 
 ```python
-from pyoarfish.client import ObClient, VecIndexParam
+from pyoarfish.client import ObClient, VecIndexParam, VecIndexType
 from pyoarfish.schema import VECTOR
 from sqlalchemy import Column, Integer
 
