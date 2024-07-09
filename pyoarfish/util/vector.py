@@ -1,4 +1,5 @@
 import numpy as np
+import json
 
 class Vector:
     def __init__(self, value):
@@ -31,6 +32,10 @@ class Vector:
         return cls([float(v) for v in value[1:-1].split(',')])
     
     @classmethod
+    def from_bytes(cls, value: bytes):
+        return cls(json.loads(value.decode()))
+    
+    @classmethod
     def _to_db(cls, value, dim=None):
         if value is None:
             return value
@@ -48,4 +53,9 @@ class Vector:
         if value is None or isinstance(value, np.ndarray):
             return value
 
-        return cls.from_text(value).to_numpy().astype(np.float32)
+        if isinstance(value, str):
+            return cls.from_text(value).to_numpy().astype(np.float32)
+        elif isinstance(value, bytes):
+            return cls.from_bytes(value).to_numpy().astype(np.float32)
+        else:
+            raise ValueError('unexpect vector type')
